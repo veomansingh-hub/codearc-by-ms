@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CODEARC — Showreel</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; background: #000; overflow: hidden; }
+  #stage {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+  }
+  canvas#reel {
+    display: block;
+    max-width: 100vw;
+    max-height: 100vh;
+    aspect-ratio: 16/9;
+  }
+  #start-overlay {
+    position: fixed; inset: 0;
+    background: #000;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: pointer; z-index: 100;
+    font-family: 'Georgia', serif;
+    color: #f3f0e8;
+    gap: 24px;
+    transition: opacity 0.4s;
+  }
+  #start-overlay h1 {
+    font-size: clamp(18px, 4vw, 48px);
+    letter-spacing: 0.3em;
+    font-weight: 400;
+  }
+  #start-overlay p {
+    font-size: clamp(10px, 1.5vw, 16px);
+    letter-spacing: 0.2em;
+    opacity: 0.5;
+    font-family: sans-serif;
+  }
+  #start-btn {
+    margin-top: 12px;
+    border: 1px solid rgba(243,240,232,0.4);
+    color: #f3f0e8;
+    padding: 14px 40px;
+    font-size: clamp(10px, 1.2vw, 14px);
+    letter-spacing: 0.3em;
+    cursor: pointer;
+    background: transparent;
+    font-family: sans-serif;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  #start-btn:hover { background: rgba(243,240,232,0.08); border-color: #f3f0e8; }
+</style>
+</head>
+<body>
+<div id="start-overlay">
+  <h1>CODEARC</h1>
+  <p>DIGITAL STUDIO · INDIA</p>
+  <button id="start-btn">▶ PLAY SHOWREEL</button>
+  <p style="opacity:0.3;font-size:clamp(8px,1vw,12px)">AUDIO ON · 8 SECONDS · 16:9</p>
+</div>
+<div id="stage"><canvas id="reel"></canvas></div>
+
+<script>
+// ─── CANVAS SETUP ─────────────────────────────────────────────────────────────
+const canvas = document.getElementById('reel');
+const ctx = canvas.getContext('2d');
+const W = 1920, H = 1080;
+canvas.width = W; canvas.height = H;
+
+// ─── WEB AUDIO ────────────────────────────────────────────────────────────────
+let AC;
+function mkAC() { AC = new (window.AudioContext || window.webkitAudioContext)(); }
+
+function bassHit(t = 0, freq = 55, dur = 0.25, gain = 1.2) {
+  const o = AC.createOscillator(), g = AC.createGain(), dist = AC.createWaveShaper();
+  const curve = new Float32Array(256);
+  for (let i=0;i<256;i++) { const x = (i*2/256-1); curve[i] = Math.tanh(x*3); }
+  dist.curve = curve;
+  o.type = 'sine'; o.frequency.setValueAtTime(freq, AC.currentTime+t);
+  o.frequency.exponentialRampToValueAtTime(freq*0.3, AC.currentTime+t+dur);
+  g.gain.setValueAtTime(0, AC.currentTime+t);
+  g.gain.linearRampToValueAtTime(gain, AC.currentTime+t+0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+t+dur);
+  o.connect(dist); dist.connect(g); g.connect(AC.destination);
+  o.start(AC.currentTime+t); o.stop(AC.currentTime+t+dur+0.05);
+}
+
+function kick(t = 0) { bassHit(t, 90, 0.18, 1.5); }
+function subBoom(t = 0) { bassHit(t, 38, 0.5, 1.8); }
+
+function whoosh(t = 0, dur = 0.18) {
+  const buf = AC.createBuffer(1, AC.sampleRate*dur, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<d.length;i++) d[i] = Math.random()*2-1;
+  const src = AC.createBufferSource(), fil = AC.createBiquadFilter(), g = AC.createGain();
+  fil.type = 'bandpass'; fil.frequency.setValueAtTime(800, AC.currentTime+t);
+  fil.frequency.exponentialRampToValueAtTime(6000, AC.currentTime+t+dur);
+  fil.Q.value = 0.8;
+  g.gain.setValueAtTime(0, AC.currentTime+t);
+  g.gain.linearRampToValueAtTime(0.6, AC.currentTime+t+dur*0.3);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+t+dur);
+  src.buffer = buf; src.connect(fil); fil.connect(g); g.connect(AC.destination);
+  src.start(AC.currentTime+t); src.stop(AC.currentTime+t+dur+0.05);
+}
+
+function rumble(startT, dur = 0.5) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sawtooth'; o.frequency.value = 35;
+  g.gain.setValueAtTime(0, AC.currentTime+startT);
+  g.gain.linearRampToValueAtTime(0.08, AC.currentTime+startT+dur*0.6);
+  g.gain.linearRampToValueAtTime(0, AC.currentTime+startT+dur);
+  o.connect(g); g.connect(AC.destination);
+  o.start(AC.currentTime+startT); o.stop(AC.currentTime+startT+dur+0.05);
+}
+
+function click(t = 0) {
+  const buf = AC.createBuffer(1, AC.sampleRate*0.03, AC.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i=0;i<d.length;i++) d[i] = (Math.random()*2-1)*Math.exp(-i/(d.length*0.1));
+  const src = AC.createBufferSource(), fil = AC.createBiquadFilter(), g = AC.createGain();
+  fil.type = 'highpass'; fil.frequency.value = 3000;
+  g.gain.setValueAtTime(0.5, AC.currentTime+t);
+  src.buffer = buf; src.connect(fil); fil.connect(g); g.connect(AC.destination);
+  src.start(AC.currentTime+t);
+}
+
+function riser(t = 0, dur = 0.3) {
+  const o = AC.createOscillator(), g = AC.createGain();
+  o.type = 'sawtooth';
+  o.frequency.setValueAtTime(80, AC.currentTime+t);
+  o.frequency.exponentialRampToValueAtTime(1200, AC.currentTime+t+dur);
+  g.gain.setValueAtTime(0, AC.currentTime+t);
+  g.gain.linearRampToValueAtTime(0.15, AC.currentTime+t+dur*0.7);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime+t+dur);
+  o.connect(g); g.connect(AC.destination);
+  o.start(AC.currentTime+t); o.stop(AC.currentTime+t+dur+0.05);
+}
+
+function scheduleAudio() {
+  // 0.00 rumble build
+  rumble(0.0, 0.45);
+  // 0.48 flash + bass slam
+  subBoom(0.48); whoosh(0.48, 0.12);
+  // 0.55 push-in whoosh
+  whoosh(0.55, 0.15); kick(0.6);
+  // 1.40 Wild Jawai whip
+  whoosh(1.40, 0.12); kick(1.42); subBoom(1.44);
+  // 1.65 quick cut
+  click(1.65); kick(1.68);
+  // 1.95 cut
+  click(1.95);
+  // 2.25 Leopard match cut
+  riser(2.05, 0.18); subBoom(2.25); whoosh(2.25, 0.1);
+  // 2.65 orbit
+  click(2.65);
+  // 3.05 Bro's Bar
+  kick(3.05); subBoom(3.08); whoosh(3.05, 0.08);
+  // 3.40 flash
+  click(3.40); kick(3.42);
+  // 3.80 drop silence then boom
+  riser(3.65, 0.14);
+  subBoom(3.80); bassHit(3.80, 55, 0.6, 2.0);
+  // word flashes
+  kick(3.95); kick(4.10); kick(4.25); kick(4.40); kick(4.55); kick(4.68);
+  // 4.70 tech transition
+  whoosh(4.70, 0.2); click(4.75); click(4.85); click(4.95); click(5.10);
+  bassHit(4.70, 60, 0.4, 1.2);
+  // 5.65 type slam
+  subBoom(5.65); whoosh(5.65, 0.1);
+  kick(6.0); subBoom(6.0);
+  // 6.45 acceleration
+  whoosh(6.45, 0.08); kick(6.45);
+  whoosh(6.65, 0.06); kick(6.65); subBoom(6.65);
+  whoosh(6.82, 0.06); kick(6.82);
+  whoosh(6.96, 0.06); kick(6.96); subBoom(6.96);
+  // 7.20 finale
+  riser(7.0, 0.18);
+  subBoom(7.20); bassHit(7.20, 40, 1.5, 2.5);
+  // tail
+  bassHit(7.8, 30, 0.8, 0.6);
+}
+
+// ─── IMAGE LOADING ────────────────────────────────────────────────────────────
+const imgs = {};
+const imgSrcs = {
+  jawai: '/wild-jawai.png',
+  leopard: '/leopard-trails.png',
+  bros: '/bros-bar.png',
+  deora: '/deora-plaza.png'
+};
+
+function loadImages() {
+  return new Promise(resolve => {
+    let count = 0;
+    const total = Object.keys(imgSrcs).length;
+    for (const [k,v] of Object.entries(imgSrcs)) {
+      const img = new Image();
+      img.onload = () => { imgs[k] = img; count++; if (count === total) resolve(); };
+      img.onerror = () => { imgs[k] = null; count++; if (count === total) resolve(); };
+      img.src = v;
+    }
+  });
+}
+
+// ─── DRAWING UTILITIES ────────────────────────────────────────────────────────
+const BONE = '#f3f0e8';
+const NEAR_BLACK = '#0b0c0b';
+const ACCENT = '#cc7843';
+const GRAPHITE = '#2c2d2c';
+
+function clearBlack() { ctx.fillStyle = '#000'; ctx.fillRect(0,0,W,H); }
+
+function drawImg(img, t, zoom = 1, panX = 0, panY = 0, alpha = 1) {
+  if (!img) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const scale = Math.max(W/iw, H/ih) * zoom;
+  const dw = iw*scale, dh = ih*scale;
+  const dx = (W-dw)/2 + panX;
+  const dy = (H-dh)/2 + panY;
+  ctx.drawImage(img, dx, dy, dw, dh);
+  ctx.restore();
+}
+
+function drawImgCrop(img, zoom, panX, panY, alpha = 1) {
+  if (!img) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const scale = Math.max(W/iw, H/ih) * zoom;
+  const dw = iw*scale, dh = ih*scale;
+  const dx = (W-dw)/2 + panX;
+  const dy = (H-dh)/2 + panY;
+  ctx.drawImage(img, dx, dy, dw, dh);
+  ctx.restore();
+}
+
+function flash(alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0,0,W,H);
+  ctx.restore();
+}
+
+function overlay(color, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = color;
+  ctx.fillRect(0,0,W,H);
+  ctx.restore();
+}
+
+function text(str, x, y, size, color = BONE, align = 'center', font = 'Georgia') {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `400 ${size}px '${font}', serif`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.fillText(str, x, y);
+  ctx.restore();
+}
+
+function textSans(str, x, y, size, color = BONE, align = 'center', weight = 700) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.font = `${weight} ${size}px 'Helvetica Neue', Arial, sans-serif`;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.letterSpacing = '0.05em';
+  ctx.fillText(str, x, y);
+  ctx.restore();
+}
+
+function motionBlurLine() {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, H/2 + (Math.random()-0.5)*20);
+  ctx.lineTo(W, H/2 + (Math.random()-0.5)*20);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// easing helpers
+const ease = {
+  out: t => 1 - Math.pow(1-t, 3),
+  in: t => t*t*t,
+  inOut: t => t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2,
+  linear: t => t
+};
+
+function lerp(a, b, t) { return a + (b-a)*t; }
+function clamp(v,a,b) { return Math.max(a,Math.min(b,v)); }
+function inv(t,a,b) { return clamp((t-a)/(b-a),0,1); }
+
+// ─── SCENE RENDERER ──────────────────────────────────────────────────────────
+let startTime = null;
+let rafId = null;
+
+function render(now) {
+  if (!startTime) startTime = now;
+  const t = Math.min((now - startTime) / 1000, 8.05); // seconds
+
+  ctx.clearRect(0,0,W,H);
+  clearBlack();
+
+  // ══ SCENE 1: 0.00–0.55 ══ Black + rumble + flash + title slam
+  if (t < 0.55) {
+    const p = inv(t, 0, 0.55);
+    clearBlack();
+    // electrical rumble texture
+    if (t > 0.05) {
+      for (let i=0; i<6; i++) {
+        ctx.save();
+        ctx.globalAlpha = 0.03 * ease.in(p) * Math.random();
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, Math.random()*H, W, 1);
+        ctx.restore();
+      }
+    }
+    // thin light sweep 0.30–0.42
+    if (t > 0.30 && t < 0.44) {
+      const sp = inv(t, 0.30, 0.44);
+      const sx = lerp(-80, W+80, ease.out(sp));
+      const grad = ctx.createLinearGradient(sx-60, 0, sx+60, 0);
+      grad.addColorStop(0, 'rgba(255,255,255,0)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.5)');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.save(); ctx.fillStyle = grad; ctx.fillRect(sx-60, 0, 120, H); ctx.restore();
+    }
+    // CODEARC flash 0.38–0.46
+    if (t > 0.38 && t < 0.46) {
+      const fa = Math.sin(inv(t, 0.38, 0.46) * Math.PI);
+      textSans('CODEARC', W/2, H/2 - 30, 90, `rgba(243,240,232,${fa * 0.9})`, 'center');
+      textSans('DIGITAL STUDIO · INDIA', W/2, H/2 + 40, 22, `rgba(243,240,232,${fa * 0.5})`, 'center', 400);
+    }
+    // WE BUILD WEBSITES slam in at 0.46
+    if (t > 0.46) {
+      const sp = clamp((t - 0.46) / 0.08, 0, 1);
+      const scale = lerp(3.5, 1, ease.out(sp));
+      const alpha = Math.min(sp * 6, 1);
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(W/2, H/2);
+      ctx.scale(scale, scale);
+      ctx.fillStyle = BONE;
+      ctx.font = `400 ${140}px 'Georgia', serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('WE BUILD WEBSITES', 0, 0);
+      ctx.restore();
+    }
+    // bass hit flash
+    if (t > 0.48 && t < 0.54) {
+      const fa = 1 - inv(t, 0.48, 0.54);
+      flash(fa * 0.25);
+    }
+  }
+
+  // ══ SCENE 2: 0.55–1.40 ══ CodeArc homepage hero push-in
+  else if (t < 1.40) {
+    const p = inv(t, 0.55, 1.40);
+    const zoom = lerp(1.5, 2.2, ease.inOut(p));
+    const panY = lerp(-60, -140, ease.inOut(p));
+    // dark near-black background for bone UI feel
+    ctx.fillStyle = BONE; ctx.fillRect(0,0,W,H);
+    // draw jawai as placeholder for hero
+    if (imgs.jawai) {
+      drawImg(imgs.jawai, t, zoom * 0.9, 0, panY * 0.5, 0.15);
+    }
+    overlay(BONE, 0.82);
+    // Hero typography push
+    const heroScale = lerp(1.0, 1.18, ease.inOut(p));
+    ctx.save();
+    ctx.translate(W/2, H/2);
+    ctx.scale(heroScale, heroScale);
+    ctx.fillStyle = NEAR_BLACK;
+    ctx.font = `400 ${108}px 'Georgia', serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('WE BUILD WEBSITES', 0, -110);
+    ctx.fillText('THAT MAKE BUSINESSES', 0, 10);
+    ctx.fillStyle = ACCENT;
+    ctx.fillText('HARD TO IGNORE.', 0, 130);
+    ctx.restore();
+    // small kicker
+    if (p > 0.2) {
+      const ka = clamp((p - 0.2) / 0.3, 0, 1);
+      ctx.save();
+      ctx.globalAlpha = ka;
+      ctx.fillStyle = GRAPHITE;
+      ctx.font = `600 18px 'Helvetica Neue', Arial, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('CODEARC · DIGITAL STUDIO · INDIA', W/2, H/2 + 220);
+      ctx.restore();
+    }
+    // entry white flash
+    if (t < 0.65) flash(1 - inv(t, 0.55, 0.65));
+  }
+
+  // ══ SCENE 3: 1.40–2.25 ══ Wild Jawai
+  else if (t < 2.25) {
+    const p = inv(t, 1.40, 2.25);
+    // whip transition blur lines
+    if (t < 1.52) {
+      clearBlack();
+      for (let i=0; i<12; i++) motionBlurLine();
+    }
+    // 3 rapid cuts within scene
+    let subImg = imgs.jawai;
+    let subZoom = 1.1 + p * 0.4;
+    let subPanX = lerp(-80, 0, ease.out(p));
+    let subPanY = lerp(0, -60, ease.out(p));
+    let subAlpha = 1;
+    // cut 1: full website
+    if (t < 1.65) {
+      subZoom = lerp(1.3, 1.5, ease.out(inv(t,1.52,1.65)));
+      subPanX = lerp(-120, 0, ease.out(inv(t,1.52,1.65)));
+    }
+    // cut 2 at 1.65: tight crop
+    else if (t < 1.95) {
+      subZoom = lerp(2.2, 2.6, ease.inOut(inv(t,1.65,1.95)));
+      subPanX = lerp(80, 20, ease.inOut(inv(t,1.65,1.95)));
+      subPanY = lerp(-80, -120, ease.inOut(inv(t,1.65,1.95)));
+    }
+    // cut 3 at 1.95: mobile crop tight
+    else {
+      subZoom = lerp(1.8, 2.0, ease.out(inv(t,1.95,2.25)));
+      subPanX = lerp(200, 160, ease.out(inv(t,1.95,2.25)));
+      subPanY = lerp(60, 20, ease.out(inv(t,1.95,2.25)));
+    }
+    if (subImg) drawImgCrop(subImg, subZoom, subPanX, subPanY, subAlpha);
+    // gradient overlay bottom
+    const grad = ctx.createLinearGradient(0,H*0.55,0,H);
+    grad.addColorStop(0,'rgba(0,0,0,0)');
+    grad.addColorStop(1,'rgba(0,0,0,0.85)');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+    // labels
+    if (p > 0.15) {
+      const la = clamp((p-0.15)/0.2,0,1) * (p < 0.85 ? 1 : 1-clamp((p-0.85)/0.15,0,1));
+      ctx.save(); ctx.globalAlpha = la;
+      ctx.fillStyle = 'rgba(243,240,232,0.7)';
+      ctx.font = `600 16px 'Helvetica Neue', Arial, sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('01  TRAVEL & HOSPITALITY', 80, H-160);
+      ctx.fillStyle = BONE;
+      ctx.font = `400 72px 'Georgia', serif`;
+      ctx.fillText('WILD JAWAI', 80, H-100);
+      ctx.restore();
+    }
+    // flash at cuts
+    if ((t > 1.63 && t < 1.66) || (t > 1.93 && t < 1.96)) flash(0.4);
+    if (t < 1.55) flash(1 - inv(t,1.40,1.55));
+    // outro
+    if (t > 2.15) {
+      const oa = inv(t,2.15,2.25);
+      for(let i=0;i<8;i++) { ctx.save(); ctx.globalAlpha = oa*0.4; ctx.fillStyle='#fff'; ctx.fillRect(0,Math.random()*H,W,1); ctx.restore(); }
+    }
+  }
+
+  // ══ SCENE 4: 2.25–3.05 ══ Leopard Trails
+  else if (t < 3.05) {
+    const p = inv(t,2.25,3.05);
+    const zoom = lerp(1.6, 2.1, ease.inOut(p));
+    const panX = lerp(100, -80, ease.inOut(p));
+    const panY = lerp(-40, 20, ease.inOut(p));
+    if (imgs.leopard) drawImgCrop(imgs.leopard, zoom, panX, panY, 1);
+    // dark overlay
+    overlay('#000', lerp(0.35, 0.55, p));
+    // label
+    if (p > 0.1) {
+      const la = clamp((p-0.1)/0.15,0,1) * (p < 0.82 ? 1 : 1-clamp((p-0.82)/0.18,0,1));
+      ctx.save(); ctx.globalAlpha = la;
+      ctx.fillStyle = 'rgba(243,240,232,0.6)';
+      ctx.font = `600 15px 'Helvetica Neue', Arial, sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('02  LUXURY HOSPITALITY', 80, H-160);
+      ctx.fillStyle = BONE;
+      ctx.font = `400 72px 'Georgia', serif`;
+      ctx.fillText('LEOPARD TRAILS', 80, H-100);
+      ctx.restore();
+    }
+    // crash through transition
+    if (t > 2.90) {
+      const cp = inv(t,2.90,3.05);
+      const cz = lerp(1, 8, ease.in(cp));
+      ctx.save();
+      ctx.globalAlpha = clamp(cp*0.8, 0, 1);
+      if (imgs.leopard) {
+        const scale = Math.max(W/imgs.leopard.naturalWidth, H/imgs.leopard.naturalHeight) * cz;
+        const dw = imgs.leopard.naturalWidth*scale, dh=imgs.leopard.naturalHeight*scale;
+        ctx.drawImage(imgs.leopard,(W-dw)/2+panX*cz,(H-dh)/2+panY*cz,dw,dh);
+      }
+      ctx.restore();
+      overlay('#000', cp * 0.9);
+    }
+    if (t < 2.38) flash(1-inv(t,2.25,2.38));
+  }
+
+  // ══ SCENE 5: 3.05–3.80 ══ Bro's Bar
+  else if (t < 3.80) {
+    const p = inv(t,3.05,3.80);
+    const zoom = lerp(1.4, 1.8, ease.inOut(p));
+    const panX = lerp(-60, 40, ease.inOut(p));
+    const panY = lerp(20, -30, ease.inOut(p));
+    if (imgs.bros) drawImgCrop(imgs.bros, zoom, panX, panY, 1);
+    overlay('#000', lerp(0.25, 0.45, p));
+    // shutter flash at 3.40
+    if (t > 3.38 && t < 3.45) flash(lerp(0.7, 0, inv(t,3.38,3.45)));
+    // after flash quick reframe
+    if (t > 3.45) {
+      const rp = inv(t,3.45,3.80);
+      const zoom2 = lerp(2.2, 2.5, ease.inOut(rp));
+      const px2 = lerp(120, 80, ease.inOut(rp));
+      const py2 = lerp(-80, -50, ease.inOut(rp));
+      if (imgs.bros) drawImgCrop(imgs.bros, zoom2, px2, py2, 1);
+      overlay('#000', 0.3);
+    }
+    if (p > 0.05) {
+      const la = clamp((p-0.05)/0.12,0,1) * (p < 0.88 ? 1 : 1-clamp((p-0.88)/0.12,0,1));
+      ctx.save(); ctx.globalAlpha = la;
+      ctx.fillStyle = 'rgba(243,240,232,0.6)';
+      ctx.font = `600 15px 'Helvetica Neue', Arial, sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('03  RESTAURANT & BAR', 80, H-160);
+      ctx.fillStyle = BONE;
+      ctx.font = `400 72px 'Georgia', serif`;
+      ctx.fillText("BRO'S BAR", 80, H-100);
+      ctx.restore();
+    }
+    if (t < 3.16) flash(1-inv(t,3.05,3.16));
+    if (t > 3.68) overlay('#000', inv(t,3.68,3.80)*0.8);
+  }
+
+  // ══ SCENE 6: 3.80–4.70 ══ Music drop + kinetic typography
+  else if (t < 4.70) {
+    const p = inv(t,3.80,4.70);
+    clearBlack();
+    // drop flash
+    if (t < 3.88) flash(1 - inv(t,3.80,3.88));
+
+    // headline
+    if (t < 4.20) {
+      const hs = clamp(inv(t,3.88,4.0),0,1);
+      const hscale = lerp(1.4, 1, ease.out(hs));
+      ctx.save();
+      ctx.globalAlpha = hs;
+      ctx.translate(W/2,H/2);
+      ctx.scale(hscale, hscale);
+      ctx.fillStyle = BONE;
+      ctx.font = `400 96px 'Georgia', serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('A GOOD WEBSITE', 0, -100);
+      ctx.fillText('SHOULD DO MORE', 0, 20);
+      ctx.fillStyle = ACCENT;
+      ctx.fillText('THAN LOOK GOOD.', 0, 140);
+      ctx.restore();
+    }
+
+    // rapid word flashes synced to kicks
+    const words = ['GET NOTICED','BUILD TRUST','GENERATE ENQUIRIES','SELL','BOOK','CALL'];
+    const wordTimes = [3.95, 4.10, 4.25, 4.40, 4.55, 4.65];
+    for (let i=0; i<words.length; i++) {
+      if (t >= wordTimes[i] && t < wordTimes[i] + 0.12) {
+        const wt = inv(t, wordTimes[i], wordTimes[i]+0.12);
+        clearBlack();
+        const wa = Math.sin(wt * Math.PI);
+        const wscale = lerp(1.8, 1.0, ease.out(wt));
+        ctx.save();
+        ctx.globalAlpha = wa;
+        ctx.translate(W/2, H/2);
+        ctx.scale(wscale, wscale);
+        ctx.fillStyle = i % 2 === 0 ? BONE : ACCENT;
+        ctx.font = `700 ${i < 2 ? 140 : i < 4 ? 180 : 220}px 'Helvetica Neue', Arial, sans-serif`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.fillText(words[i], 0, 0);
+        ctx.restore();
+      }
+    }
+  }
+
+  // ══ SCENE 7: 4.70–5.65 ══ Tech transition → RestroSuite UI
+  else if (t < 5.65) {
+    const p = inv(t,4.70,5.65);
+    // Start with Deora (software adjacent)
+    const zoom = lerp(1.8, 1.2, ease.inOut(p));
+    const panY = lerp(-40, 0, ease.inOut(p));
+    if (imgs.deora) drawImgCrop(imgs.deora, zoom, 0, panY, 1);
+    overlay('#000', lerp(0.4, 0.65, p));
+    // UI click indicators - small rectangles suggesting dashboard
+    if (p > 0.2) {
+      const ua = clamp((p-0.2)/0.15,0,1);
+      ctx.save(); ctx.globalAlpha = ua * 0.8;
+      // fake dashboard overlay lines suggesting interface depth
+      ctx.strokeStyle = 'rgba(204,120,67,0.5)';
+      ctx.lineWidth = 1;
+      for (let i=0;i<5;i++) {
+        const by = H*0.35 + i*36;
+        const bw = lerp(200, 340, i/4);
+        ctx.strokeRect(80, by, bw, 22);
+      }
+      ctx.fillStyle = 'rgba(204,120,67,0.6)';
+      ctx.fillRect(80, H*0.35, 120, 22);
+      // software label
+      ctx.fillStyle = BONE;
+      ctx.font = `400 56px 'Georgia', serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('RESTROSUITE', 80, H*0.25);
+      ctx.fillStyle = 'rgba(243,240,232,0.5)';
+      ctx.font = `500 16px 'Helvetica Neue', Arial, sans-serif`;
+      ctx.fillText('RESTAURANT OS · LIVE', 82, H*0.25+52);
+      ctx.restore();
+    }
+    // macro zoom into interface elements
+    if (p > 0.5) {
+      const mp = clamp((p-0.5)/0.5,0,1);
+      const mzoom = lerp(1.2, 2.5, ease.in(mp));
+      const mpx = lerp(0, 120, ease.in(mp));
+      const mpy = lerp(0, -80, ease.in(mp));
+      ctx.save(); ctx.globalAlpha = mp * 0.5;
+      if (imgs.deora) drawImgCrop(imgs.deora, mzoom, mpx, mpy, 1);
+      ctx.restore();
+      overlay('#000', mp * 0.6);
+    }
+    if (t < 4.82) flash(1-inv(t,4.70,4.82));
+    // clicks visual pulses
+    const clickTs = [4.75,4.85,4.95,5.10,5.25,5.40];
+    for (const ct of clickTs) {
+      if (t > ct && t < ct + 0.05) {
+        ctx.save(); ctx.globalAlpha = 0.3;
+        ctx.strokeStyle = ACCENT; ctx.lineWidth = 1;
+        ctx.strokeRect(78, H*0.35-2, 122, 26);
+        ctx.restore();
+      }
+    }
+  }
+
+  // ══ SCENE 8: 5.65–6.45 ══ Typographic statement
+  else if (t < 6.45) {
+    const p = inv(t,5.65,6.45);
+    clearBlack();
+    if (t < 6.0) {
+      // BEAUTIFUL ON THE OUTSIDE
+      const a = clamp(inv(t,5.65,5.78),0,1);
+      const ap = clamp(inv(t,5.88,6.0),0,1);
+      const outAlpha = a * (1 - ap);
+      ctx.save(); ctx.globalAlpha = outAlpha;
+      ctx.fillStyle = BONE;
+      ctx.font = `400 130px 'Georgia', serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('BEAUTIFUL', W/2, H/2 - 70);
+      ctx.font = `400 80px 'Georgia', serif`;
+      ctx.fillStyle = 'rgba(243,240,232,0.5)';
+      ctx.fillText('ON THE OUTSIDE.', W/2, H/2 + 60);
+      ctx.restore();
+      // flash behind it website
+      if (t < 5.78 && imgs.jawai) {
+        ctx.save(); ctx.globalAlpha = 0.15;
+        drawImg(imgs.jawai, t, 1.3, 0, 0, 1);
+        ctx.restore();
+      }
+    }
+    // flash between
+    if (t > 5.88 && t < 6.02) flash(inv(t,5.88,5.95) * (1-inv(t,5.95,6.02)));
+    if (t >= 6.0) {
+      // SERIOUS UNDERNEATH
+      const a = clamp(inv(t,6.0,6.12),0,1);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.fillStyle = BONE;
+      ctx.font = `400 130px 'Georgia', serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('SERIOUS', W/2, H/2 - 70);
+      ctx.fillStyle = ACCENT;
+      ctx.fillText('UNDERNEATH.', W/2, H/2 + 60);
+      ctx.restore();
+      // flashing between web + software
+      const flashCycle = Math.floor((t - 6.0) / 0.1) % 2;
+      if (flashCycle === 0 && imgs.jawai) {
+        ctx.save(); ctx.globalAlpha = 0.2;
+        drawImg(imgs.jawai, t, 1.2, 0, 0, 1);
+        ctx.restore();
+      } else if (flashCycle === 1 && imgs.deora) {
+        ctx.save(); ctx.globalAlpha = 0.2;
+        drawImg(imgs.deora, t, 1.2, 0, 0, 1);
+        ctx.restore();
+      }
+      overlay('#000', 0.6);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.fillStyle = BONE;
+      ctx.font = `400 130px 'Georgia', serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('SERIOUS', W/2, H/2 - 70);
+      ctx.fillStyle = ACCENT;
+      ctx.fillText('UNDERNEATH.', W/2, H/2 + 60);
+      ctx.restore();
+    }
+    if (t < 5.75) flash(1-inv(t,5.65,5.75));
+  }
+
+  // ══ SCENE 9: 6.45–7.20 ══ Ultra-fast project flashes
+  else if (t < 7.20) {
+    const beats = [
+      { img: 'jawai',   label: 'WILD JAWAI',     t0: 6.45, t1: 6.63, zoom: 1.6, px: -80, py: 0 },
+      { img: 'leopard', label: 'LEOPARD TRAILS',  t0: 6.63, t1: 6.80, zoom: 1.5, px: 60, py: -40 },
+      { img: 'bros',    label: "BRO'S BAR",       t0: 6.80, t1: 6.96, zoom: 1.8, px: 0, py: 20 },
+      { img: 'deora',   label: 'DEORA PLAZA',     t0: 6.96, t1: 7.20, zoom: 1.4, px: -40, py: -20 }
+    ];
+    for (const b of beats) {
+      if (t >= b.t0 && t < b.t1) {
+        const bp = inv(t, b.t0, b.t1);
+        const bz = lerp(b.zoom, b.zoom + 0.3, ease.out(bp));
+        const bpx = lerp(b.px, b.px * 0.5, ease.out(bp));
+        if (imgs[b.img]) drawImgCrop(imgs[b.img], bz, bpx, b.py, 1);
+        overlay('#000', lerp(0.2, 0.5, bp));
+        // label flash
+        const la = Math.min(bp * 5, 1);
+        ctx.save(); ctx.globalAlpha = la;
+        ctx.fillStyle = BONE;
+        ctx.font = `400 90px 'Georgia', serif`;
+        ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        ctx.fillText(b.label, 80, H - 100);
+        ctx.restore();
+        // whip transition blur
+        if (bp < 0.12) {
+          for (let i=0; i<10; i++) motionBlurLine();
+          flash(1 - bp/0.12);
+        }
+        if (bp > 0.88) {
+          for (let i=0; i<8; i++) motionBlurLine();
+        }
+      }
+    }
+  }
+
+  // ══ SCENE 10: 7.20–8.00+ ══ Final CODEARC brand frame
+  else {
+    const p = inv(t, 7.20, 8.0);
+    clearBlack();
+    // entry flash
+    if (t < 7.32) flash(1 - inv(t, 7.20, 7.32));
+
+    // subtle light travel across text
+    const lightX = lerp(-200, W+200, ease.inOut(p));
+    const grad = ctx.createLinearGradient(lightX-180, 0, lightX+180, 0);
+    grad.addColorStop(0, 'rgba(243,240,232,0)');
+    grad.addColorStop(0.5, 'rgba(243,240,232,0.04)');
+    grad.addColorStop(1, 'rgba(243,240,232,0)');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
+
+    // CODEARC wordmark
+    const wa = clamp(inv(t, 7.22, 7.42), 0, 1);
+    const wscale = lerp(1.08, 1, ease.out(clamp(inv(t,7.22,7.38),0,1)));
+    ctx.save();
+    ctx.globalAlpha = wa;
+    ctx.translate(W/2, H/2 - 60);
+    ctx.scale(wscale, wscale);
+    ctx.fillStyle = BONE;
+    ctx.font = `400 160px 'Georgia', serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('CODEARC', 0, 0);
+    ctx.restore();
+
+    // Digital Studio · India
+    if (p > 0.18) {
+      const da = clamp((p-0.18)/0.12,0,1);
+      ctx.save(); ctx.globalAlpha = da * 0.7;
+      ctx.fillStyle = 'rgba(243,240,232,0.7)';
+      ctx.font = `500 20px 'Helvetica Neue', Arial, sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('DIGITAL STUDIO · INDIA', W/2, H/2 + 60);
+      ctx.restore();
+    }
+    // tagline
+    if (p > 0.35) {
+      const ta = clamp((p-0.35)/0.15,0,1);
+      ctx.save(); ctx.globalAlpha = ta * 0.85;
+      ctx.fillStyle = BONE;
+      ctx.font = `400 42px 'Georgia', serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('WE BUILD WEBSITES', W/2, H/2 + 150);
+      ctx.fillText('THAT MAKE BUSINESSES', W/2, H/2 + 210);
+      ctx.fillStyle = ACCENT;
+      ctx.fillText('HARD TO IGNORE.', W/2, H/2 + 268);
+      ctx.restore();
+    }
+    // URL
+    if (p > 0.7) {
+      const ua = clamp((p-0.7)/0.2,0,1);
+      ctx.save(); ctx.globalAlpha = ua * 0.45;
+      ctx.fillStyle = BONE;
+      ctx.font = `400 16px 'Helvetica Neue', Arial, sans-serif`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('CODEARC.CO.IN', W/2, H/2 + 360);
+      ctx.restore();
+    }
+
+    // grain texture for cinematic finish
+    for (let i=0; i<40; i++) {
+      ctx.save();
+      ctx.globalAlpha = 0.008;
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(Math.random()*W, Math.random()*H, 1, 1);
+      ctx.restore();
+    }
+  }
+
+  // ── global grain ──────────────────────────────────────────────────────
+  for (let i=0; i<20; i++) {
+    ctx.save();
+    ctx.globalAlpha = 0.012 * Math.random();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(Math.random()*W, Math.random()*H, 1, 1);
+    ctx.restore();
+  }
+
+  if (t < 8.05) rafId = requestAnimationFrame(render);
+}
+
+// ─── START ────────────────────────────────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', async () => {
+  mkAC();
+  await loadImages();
+  const overlay = document.getElementById('start-overlay');
+  overlay.style.opacity = '0';
+  overlay.style.pointerEvents = 'none';
+  scheduleAudio();
+  startTime = null;
+  rafId = requestAnimationFrame(render);
+});
+</script>
+</body>
+</html>
