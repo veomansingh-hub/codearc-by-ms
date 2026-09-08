@@ -56,7 +56,7 @@
 </style>
 </head>
 <body>
-<div id="start-overlay">
+<div id="start-overlay" style="display:none">
   <h1>CODEARC</h1>
   <p>DIGITAL STUDIO · INDIA</p>
   <button id="start-btn">▶ PLAY SHOWREEL</button>
@@ -838,3 +838,29 @@ document.getElementById('start-btn').addEventListener('click', async () => {
 </script>
 </body>
 </html>
+
+<script>
+// AUTOPLAY on page load — audio unlocks on first click/tap
+window.addEventListener('load', async () => {
+  mkAC();
+  await loadImages();
+  // Try to resume AudioContext immediately (works if page was interacted with before)
+  if (AC.state === 'suspended') {
+    // Schedule audio when user first interacts
+    const unlock = async () => {
+      await AC.resume();
+      scheduleAudio();
+      document.removeEventListener('click', unlock);
+      document.removeEventListener('touchstart', unlock);
+    };
+    document.addEventListener('click', unlock, { once: true });
+    document.addEventListener('touchstart', unlock, { once: true });
+    // Also try a silent unlock immediately
+    try { await AC.resume(); scheduleAudio(); } catch(e) {}
+  } else {
+    scheduleAudio();
+  }
+  startTime = null;
+  rafId = requestAnimationFrame(render);
+});
+</script>

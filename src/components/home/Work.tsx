@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 
@@ -10,28 +11,32 @@ const PROJECTS = [
     title: "WILD JAWAI",
     sector: "TRAVEL & HOSPITALITY",
     desc: "A cinematic destination experience built around Jawai, wildlife, safaris and direct guest enquiry.",
-    bg: "bg-near-black",
+    img: "/wild-jawai.png",
+    objectPos: "top",
   },
   {
     id: "leopard-trails",
     title: "LEOPARD TRAILS",
     sector: "LUXURY HOSPITALITY",
     desc: "A visual hospitality experience designed around atmosphere, accommodation and safari discovery.",
-    bg: "bg-graphite",
+    img: "/leopard-trails.png",
+    objectPos: "top",
   },
   {
     id: "bros-bar",
     title: "BRO'S BAR",
     sector: "RESTAURANT & BAR",
     desc: "Fast billing and floor flow for high-volume service hours.",
-    bg: "bg-accent",
+    img: "/bros-bar.png",
+    objectPos: "top",
   },
   {
     id: "deora-plaza",
     title: "DEORA PLAZA",
     sector: "HOSPITALITY OS",
     desc: "Full hospitality OS — hotel, cafe and floor ops behind a dark luxury entry.",
-    bg: "bg-near-black",
+    img: "/deora-plaza.png",
+    objectPos: "top",
   }
 ];
 
@@ -55,6 +60,7 @@ export function Work() {
               <button
                 key={project.id}
                 onMouseEnter={() => setActiveProject(project)}
+                onClick={() => setActiveProject(project)}
                 className={`text-left border-b border-soft-grey pb-6 transition-all duration-300 ${
                   activeProject.id === project.id ? "opacity-100 pl-4 border-near-black" : "opacity-40 hover:opacity-70"
                 }`}
@@ -74,14 +80,21 @@ export function Work() {
           </div>
 
           <div className="col-span-7">
-            <div className={`w-full h-full rounded-2xl ${activeProject.bg} text-bone p-12 flex flex-col justify-end transition-colors duration-500 relative overflow-hidden group`}>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
-              {/* Image placeholder */}
-              <div className="absolute inset-0 flex items-center justify-center font-display text-4xl opacity-20 z-0">
-                [ {activeProject.title} VISUAL ]
-              </div>
+            <div className="w-full h-full rounded-2xl text-bone flex flex-col justify-end transition-all duration-500 relative overflow-hidden group min-h-[540px]">
+              {/* Real screenshot */}
+              <Image
+                key={activeProject.id}
+                src={activeProject.img}
+                alt={activeProject.title}
+                fill
+                className="object-cover object-top transition-opacity duration-300"
+                sizes="(max-width: 1024px) 100vw, 60vw"
+                priority
+              />
+              {/* Gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent z-10" />
               
-              <div className="relative z-20 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+              <div className="relative z-20 p-10 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
                 <span className="text-xs font-bold tracking-widest uppercase bg-bone text-near-black px-3 py-1 rounded-full mb-4 inline-block">
                   {activeProject.sector}
                 </span>
@@ -104,21 +117,25 @@ export function Work() {
         <div className="flex flex-col gap-12 lg:hidden">
           {PROJECTS.map((project) => (
             <div key={project.id} className="flex flex-col">
-              <div className={`w-full aspect-[4/5] rounded-xl ${project.bg} mb-6 relative overflow-hidden flex items-end p-6`}>
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent z-10" />
-                 <div className="absolute inset-0 flex items-center justify-center font-display text-2xl text-bone opacity-20 z-0">
-                  [ VISUAL ]
-                 </div>
-                 <div className="relative z-20">
-                   <h4 className="text-4xl font-display text-bone mb-2">{project.title}</h4>
-                   <p className="text-bone/80 text-sm mb-6">{project.desc}</p>
-                   <Link
+              <div className="w-full aspect-[4/5] rounded-xl mb-6 relative overflow-hidden flex items-end">
+                <Image
+                  src={project.img}
+                  alt={project.title}
+                  fill
+                  className="object-cover object-top"
+                  sizes="100vw"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent z-10" />
+                <div className="relative z-20 p-6">
+                  <h4 className="text-4xl font-display text-bone mb-2">{project.title}</h4>
+                  <p className="text-bone/80 text-sm mb-6">{project.desc}</p>
+                  <Link
                     href={`/work/${project.id}`}
                     className="inline-flex items-center gap-2 bg-bone text-near-black px-5 py-2.5 rounded-full text-sm font-medium"
                   >
                     VIEW PROJECT
                   </Link>
-                 </div>
+                </div>
               </div>
             </div>
           ))}

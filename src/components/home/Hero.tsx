@@ -1,10 +1,38 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowDown } from "lucide-react";
 
+const HERO_PROJECTS = [
+  { img: "/wild-jawai.png",      label: "Wild Jawai",      sub: "Travel & Hospitality" },
+  { img: "/leopard-trails.png",  label: "Leopard Trails",  sub: "Luxury Hospitality" },
+  { img: "/bros-bar.png",        label: "Bro's Bar",       sub: "Restaurant & Bar" },
+  { img: "/deora-plaza.png",     label: "Deora Plaza",     sub: "Hospitality OS" },
+];
+
 export function Hero() {
+  const [current, setCurrent] = useState(0);
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFading(true);
+      setTimeout(() => {
+        setCurrent((c) => (c + 1) % HERO_PROJECTS.length);
+        setFading(false);
+      }, 400);
+    }, 3200);
+    return () => clearInterval(interval);
+  }, []);
+
+  const project = HERO_PROJECTS[current];
+
   return (
     <section className="relative min-h-screen flex items-center pt-24 pb-12 overflow-hidden">
       <div className="container mx-auto px-4 md:px-8 relative z-10 flex flex-col lg:flex-row items-center gap-12 lg:gap-24 h-full">
+        {/* Copy */}
         <div className="flex-1 w-full max-w-4xl">
           <div className="flex items-center gap-4 mb-8">
             <span className="text-xs tracking-[0.2em] font-semibold uppercase text-graphite border border-graphite/20 px-3 py-1 rounded-full">
@@ -56,15 +84,45 @@ export function Hero() {
           </div>
         </div>
 
-        {/* Hero Visual - Showreel/Cinematic Fragments */}
-        <div className="hidden lg:block w-[400px] h-[600px] relative rounded-2xl overflow-hidden shadow-2xl bg-near-black flex-shrink-0">
-          <div className="absolute inset-0 bg-gradient-to-tr from-near-black via-graphite to-accent opacity-20" />
-          <div className="absolute inset-0 flex items-center justify-center text-bone/50 font-display text-2xl">
-            [ SHOWREEL ]
+        {/* Hero Visual — cycling real project screenshots */}
+        <div className="hidden lg:block w-[400px] h-[580px] relative rounded-2xl overflow-hidden shadow-2xl flex-shrink-0">
+          {/* Current image */}
+          <div
+            className="absolute inset-0 transition-opacity duration-400"
+            style={{ opacity: fading ? 0 : 1, transition: "opacity 0.4s ease" }}
+          >
+            <Image
+              src={project.img}
+              alt={project.label}
+              fill
+              className="object-cover object-top"
+              sizes="400px"
+              priority
+            />
           </div>
-          <div className="absolute bottom-6 left-6 right-6 p-4 backdrop-blur-md bg-bone/10 rounded-xl border border-bone/20 text-bone text-sm">
-            <span className="block font-bold mb-1">Wild Jawai Safari</span>
-            <span className="opacity-80">Cinematic Destination Experience</span>
+
+          {/* Dark gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent z-10" />
+
+          {/* Label card */}
+          <div
+            className="absolute bottom-6 left-6 right-6 p-4 backdrop-blur-md bg-black/40 rounded-xl border border-white/10 text-bone text-sm z-20"
+            style={{ opacity: fading ? 0 : 1, transition: "opacity 0.4s ease" }}
+          >
+            <span className="block font-bold mb-1">{project.label}</span>
+            <span className="opacity-70 text-xs uppercase tracking-widest">{project.sub}</span>
+          </div>
+
+          {/* Dot indicators */}
+          <div className="absolute top-5 right-5 flex gap-1.5 z-20">
+            {HERO_PROJECTS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => { setFading(true); setTimeout(() => { setCurrent(i); setFading(false); }, 400); }}
+                className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${i === current ? "bg-bone w-4" : "bg-bone/40"}`}
+                aria-label={`Show project ${i + 1}`}
+              />
+            ))}
           </div>
         </div>
       </div>
