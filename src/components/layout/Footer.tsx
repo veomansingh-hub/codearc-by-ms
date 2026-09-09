@@ -74,9 +74,6 @@ export function Footer() {
           <p>© {new Date().getFullYear()} CodeArc</p>
           <div className="flex gap-6">
             <span className="hidden md:inline">CODEARC — INDIA</span>
-            <a href="https://theomedia.co.uk" target="_blank" rel="noopener noreferrer" className="hover:text-bone transition-colors">
-              THEOMEDIA — UK · IRELAND · EUROPE
-            </a>
           </div>
           <div className="flex gap-4">
             <Link href="/privacy" className="hover:text-bone transition-colors">Privacy</Link>

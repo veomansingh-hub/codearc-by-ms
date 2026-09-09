@@ -5,8 +5,7 @@ const WORKS = [
   { slug: "wild-jawai", title: "WILD JAWAI", sector: "TRAVEL & HOSPITALITY", status: "LIVE PROJECT" },
   { slug: "leopard-trails", title: "LEOPARD TRAILS", sector: "LUXURY HOSPITALITY", status: "LIVE PROJECT" },
   { slug: "bros-bar", title: "BRO'S BAR", sector: "RESTAURANT & BAR", status: "LIVE PROJECT" },
-  { slug: "deora-plaza", title: "DEORA PLAZA", sector: "HOSPITALITY OS", status: "LIVE SYSTEM" },
-  { slug: "theo-media", title: "THEOMEDIA", sector: "DIGITAL STUDIO", status: "SISTER BRAND" }
+  { slug: "deora-plaza", title: "DEORA PLAZA", sector: "HOSPITALITY OS", status: "LIVE SYSTEM" }
 ];
 
 export default function WorkPage() {
